@@ -1,0 +1,1437 @@
+\documentclass{article}
+
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{listings}
+
+\lstset{
+  aboveskip=12pt,
+  belowskip=0pt,
+  basicstyle=\fontsize{8.5pt}{8.5pt}\ttfamily,
+  breaklines=true,
+  captionpos=b,
+  frame=tb,
+  framexbottommargin=5pt,
+  framextopmargin=5pt,
+}
+
+\usepackage{enumitem}
+
+\setlist[description]{
+  itemsep=0pt,
+  topsep=0pt,
+  labelindent=1em,
+  leftmargin=1em,
+}
+
+\setlist[enumerate]{
+  itemsep=0pt,
+  topsep=0pt,
+}
+
+\setlist[itemize]{
+  itemsep=0pt,
+  topsep=0pt,
+  labelindent=1em,
+  leftmargin=1em,
+}
+
+\usepackage[accepted]{sysml2019}
+
+% The \sysmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+%\sysmltitlerunning{Guild AI: NEEDS A TITLE}
+
+\begin{document}
+
+\twocolumn[
+\sysmltitle{Guild AI: Package management for machine learning models}
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+\begin{sysmlauthorlist}
+\sysmlauthor{Garrett Smith}{guild}
+\end{sysmlauthorlist}
+
+\sysmlaffiliation{guild}{Guild AI, Chicago, Illinois, USA}
+
+\sysmlcorrespondingauthor{Garrett Smith}{garrett@guild.ai}
+
+% You may provide any keywords that you
+% find helpful for describing your paper; these are used to populate
+% the "keywords" metadata in the PDF but will not be shown in the document
+\sysmlkeywords{Guild AI, SysML}
+
+\vskip 0.3in
+
+\begin{abstract}
+
+  We present Guild AI, an open source toolkit that facilitates model
+  reuse for application development by applying traditional software
+  packaging constructs to the domain of machine learning. Package
+  management strategies are central to successful software
+  ecosystems. Examples include npm for JavaScript \cite{npm}, APT for
+  Debian \cite{apt}, and pip for Python \cite{pip}. Such tools excel
+  at creating traditional software packages. Machine learning
+  applications however present unique requirements that call for tool
+  specialization. Guild AI combines the proven effectiveness of
+  package managers with novel features to enable machine learning
+  model reuse for application development across a variety of use
+  cases.
+
+\end{abstract}
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column
+% listing the affiliations and the copyright notice.
+% The command takes one argument, which is text to display at the start of the footnote.
+% The \sysmlEqualContribution command is standard text for equal contribution.
+% Remove it (just {}) if you do not need this facility.
+
+\printAffiliationsAndNotice{}  % leave blank if no need to mention equal contribution
+%\printAffiliationsAndNotice{\sysmlEqualContribution} % otherwise use the standard text.
+
+\section{Introduction}
+
+Code reuse is a central tenet in software development and is supported
+by myriad techniques, abstractions, and tools. Effective code reuse
+allows developers to leverage prior work in a consistent, reliable way
+that saves time and improves software quality. In this paper we
+consider code reuse in terms of \emph{packaged software} in the
+context of machine learning.
+
+\subsection{Traditional Packaged Software}
+
+Packaged software is software that is organized in a way that can be
+easily installed and used by \emph{users}. A user is a consumer of
+software, rather than a producer or developer. A user may be software
+developer, in the case of consuming software libraries or frameworks,
+or she may be an end-user who uses software as a program with a
+graphical or command line interface. In both cases, packaged software
+may be provided in units that the user can install and start using
+quickly and reliably.
+
+This is an example of installing packaged software:
+
+{\footnotesize
+\begin{verbatim}
+ $ pip install tensorflow
+\end{verbatim}}
+
+By running this command, a user is using a \emph{package manager}---in
+this case the program \texttt|pip|---to install a package named
+\verb|tensorflow|. With this innocuous command, the user implicitly expects
+a number of things:
+
+\begin{itemize}
+\item The Python module \verb|tensorflow| should be installed.
+\item Additional Python modules required by \verb|tensorflow| should
+  also be installed.
+\item Installed software should work as expected on the target system.
+\item At a future date \verb|tensorflow| may be similarly uninstalled
+  along with its no-longer-used required packages.
+\item The act of installing and uninstalling \verb|tensorflow| should
+  not break or otherwise destabilize other installed software on the
+  target system.
+\end{itemize}
+
+Such package management facilities are essential to code reuse at the
+system level. Package managers allow users to maintain complex
+software systems with simple commands in a way that preserves their
+integrity. They support rapid experimentation with new software as
+users are free to install, use, and evaluate packages with the
+confidence that they can safely remove that software later.
+
+\iffalse
+Package managers promote healthy software ecosystems by facilitating
+software \emph{publishing}. Software authors use packaging tools to
+create the installable software units---\emph{packages}---that are so
+easily consumed by users. By publishing packaged software, developers
+signify that their software will work as advertised if installed using
+the applicable tools.
+
+Software ecosystems that are enabled by package managers include
+Python, JavaScript, Ruby, Go, and R. The GNU/Linux operating system
+itself is an ecosystem of package management ecosystems including
+packaging schemes from Debian, RedHat, Gentoo, and Arch
+distributions. Package managers are established cornerstones of
+software reuse across languages and operating systems.
+\fi
+
+\subsection{Code Reuse and Machine Learning Models}
+
+A \emph{machine learning model} is challenging to define as models
+have different contexts. In the most general context, models are
+mathematical concepts or language that represents a system. In the
+context of machine learning, models may be represented by computer
+source code, either explicitly as declared structures, or implicitly
+by way of executable instructions that perform model related tasks. A
+\emph{trained model} is a model that has learned some representation
+of a system through an automated process of optimization.
+
+For the purpose of our discussion, a machine learning model is a
+software representation of a specific mathematical concept that can be
+trained by a computer. Models may be in various states:
+\emph{uninitialized}, \emph{initialized}, \emph{partially trained},
+\emph{fully trained}, etc. Regardless of state, the distinguishing
+feature of machine learning models for our purpose is that they
+support runnable operations.
+
+Models---and in particular \emph{trained models}---are similar to
+traditional software in that they can be executed to perform
+computations. In fact, the purpose of training a model is to create a
+computer program. The difference between a trained model and a human
+authored program is one of method: a trained model is learned by an
+algorithm while a human authored program is written manually.
+
+\iffalse
+While models may be represented in part by traditional installed
+software---e.g. an imperative TensorFlow program that defines a model
+graph structure when executed---models require more to be construed as
+reusable code: \emph{models must support operations on novel data}. If
+they cannot be applied to novel data---either for training or for
+inference---they cannot be considered reusable software.
+\fi
+
+The remainder of this paper will outline an approach to package
+management that incorporates \emph{model operations} and \emph{run
+  management} as an enabler of code reuse for machine learning models.
+
+\subsection{Related Work}
+
+\subsubsection{Model zoos}
+
+A common approach to sharing and reusing machine learning models is a
+\emph{model zoo}---an online repository of reusable models that
+includes source code, examples, documentation, and in some cases
+pretrained models. The Caffe Model Zoo \cite{caffezoo} was one of the
+first model zoos and has inspired several others \cite{tfzoo,mxzoo}.
+
+Model zoos encourage code reuse by consolidating related
+models---e.g. based on underlying library implementation or
+application domain---and providing consistent documentation and
+repeatable methods for model use.
+
+Model zoos, however, do not typically provide tools for packaging,
+distributing, and using models beyond those of publishing source code
+and documentation (e.g. GitHub, web sites, etc.)
+
+\subsubsection{TensorFlow Hub and Keras Applications}
+
+TensorFlow Hub modules \cite{tfhub} and Keras Applications
+\cite{kerasapps} are examples of framework level facilities that
+provide a higher degree of model reuse vis-\'a-vis model zoos. Both
+TensorFlow Hub modules and Keras application support tools and
+patterns for packaging, distributing, and using model source code and
+associated pretrained models. They emphasize the use of \emph{transfer
+  learning} for applying pretrained models to data from different
+domains.
+
+\subsubsection{Software Packages and Source Code Repositories}
+
+Models are commonly reused through traditional software distribution
+channels: \emph{packages} and \emph{source code repositories}. In both
+cases, model source code is provided along with varying levels of
+documentation and supporting tools. Unlike model zoos and framework
+facilities, the level of code reuse available through these channels
+is spotty and inconsistent.
+
+\subsection{Differences}
+
+Guild AI combines elements from model zoos, framework packages, and
+traditional software channels to provide a state of the art facility
+for packaging, distributing and using machine learning models.
+
+As with model zoos, users can discover Guild AI models, including
+documentation. Guild AI additionally supports installation and direct
+use of models through operations.
+
+Guild AI superficially resembles TensorFlow Hub in that users can
+discover, install, and use models quickly and easily. Guild AI however
+differs considerably in its implementation. Guild AI does not use a
+programming interface but instead supports its features by way of
+declared configuration and system level tools. Guild AI packaging
+facilities can be applied to any machine learning model
+implementation.
+
+Guild AI also supports the process of \emph{package maintenance},
+where a third party---a package maintainer---creates usable packages
+without necessarily coordinating with upstream model developers. This
+is discussed in Section \ref{sec:package-maintainer}.
+
+As with traditional software packages and source code repositories,
+Guild AI supports a federated approach to software distribution. Users
+are free to use Guild AI to create and distribute reusable models in a
+variety of ways. Refer to Section \ref{sec:use-cases} for coverage of
+various use case.
+
+\section{Concepts}
+
+This paper relies on a number of core concepts, which are defined
+below.
+
+\subsection{Projects}
+
+A \emph{project} is a directory that contains model related
+code. Model \emph{developers} maintain projects for their
+models. Model \emph{users} maintain projects for their applications,
+which may use models for training, inference, etc.
+
+Projects are central to model development and use. Guild AI supports
+project based workflow as described in Section
+\ref{sec:streamline-workflow}.
+
+\subsection{Guild File}
+
+A \emph{Guild file} is a plain text file containing Guild AI related
+configuration. The file is named \verb|guild.yml| and is typically
+located in the root directory of a Guild AI enabled project.
+
+Listing~\ref{lst:guild-file} illustrates a simple Guild file.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Simple Guild file example,
+    label={lst:guild-file}]
+model: mnist
+description:
+  Logistic regression classifier
+  of MNIST digits
+operations:
+  train:
+    main: train_mnist
+    flags:
+      batch-size: 32
+      train-steps: 1000
+  evaluate:
+    main: eval_mnist
+\end{lstlisting}
+\end{figure}
+
+\subsection{Packages}
+
+A Guild AI \emph{package} is a Python wheel distribution \cite{wheels}
+that was generated using the \verb|guild package| command. Guild AI
+packages are generated using \verb|setuptools|. They contain Guild AI
+specific metadata that advertises models they contain.
+
+\subsection{Models}
+
+A Guild AI \emph{model} is a representation of a machine learning
+model that is defined in a Guild file. Models define \emph{operations}
+(Section \ref{sec:operations}) that perform model related tasks such
+as training or evaluating as well as \emph{resources} that operations
+may require (Section \ref{sec:resources}).
+
+Models may be defined according to the underlying architecture or
+intended use of the model.
+
+\subsection{Operations}
+\label{sec:operations}
+
+An \emph{operation} is an action that can be performed on a
+model. Operations are part of a model definition.
+
+Guild AI does not prescribe any particular set of operations that must
+be defined for a model. Model developers are free to name operations
+as they see fit, though Guild AI does encourage the use of consistent
+naming conventions.
+
+Below are some common operation names.
+
+\begin{description}
+\item[prepare] prepare a dataset for training
+\item[train] train a model from scratch
+\item[transfer-learn] train a model using transfer learning
+\item[finetune] finetune a trained model
+\item[evaluate] evaluate/test a model
+\item[classify] use a trained model for classification
+\item[compress] compress a trained model (e.g. using quantization,
+  etc.)
+\item[export-and-freeze] export a frozen inference
+  graph\footnote{TensorFlow specific}
+\item[tflite] generate a TF Lite file from a frozen
+  model\footnotemark[\value{footnote}]
+\end{description}
+
+This list illustrates that model operations can be used to perform
+tasks beyond just training and evaluation. Feature rich models can
+encompass all of the operations associated with a machine learning
+development pipeline, from data acquisition and preparation through
+training and optimization to application deployment and monitoring.
+
+\subsection{Flags}
+
+\emph{Flags} are parameters that can be set or modified by users when
+they run an operation. Flags are used as inputs to the underlying code
+that implements an operation.
+
+Below is an example of using a flag to set the \emph{learning rate}
+for a \emph{train} operation.
+
+{\footnotesize
+\begin{verbatim}
+ $ guild run train learning-rate=0.0001
+\end{verbatim}}
+
+\subsection{Resources}
+\label{sec:resources}
+
+A Guild AI \emph{resource} represents a set of source files that can
+be made available as inputs to a model operation. Resources play an
+important role in Guild AI's ability to effective use
+models. Resources can be used to resolve project files, download files
+from URLs, unpack archives, and reference files generated by other
+operation.
+
+Listing~\ref{lst:resource} contains a resource definition for a
+model. The resource \verb|idx-data| defines four source files that
+will be made available to any operation that requires that resource.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Model resource example,
+    label={lst:resource}]
+model: mnist
+resources:
+  idx-data:
+    description:
+      MNIST dataset in compressed
+      IDX format
+    sources:
+      - train-images-idx3-ubyte.gz
+      - train-labels-idx1-ubyte.gz
+      - t10k-images-idx3-ubyte.gz
+      - t10k-labels-idx1-ubyte.gz
+\end{lstlisting}
+\end{figure}
+
+\subsection{Runs}
+
+A \emph{run} is a file system artifact---specifically a directory
+created and managed by Guild AI---that contains metadata and files
+generated by an operation. A run may also refer to the operation
+system process associated with a running operation.
+
+Runs are further described in Section \ref{sec:runs}.
+
+\subsection{Run Directories}
+\label{sec:run-dir}
+
+A \emph{run directory} is a directory used for a run. When an
+operation is run, the run directory is used as the operating system
+process working directory. Operations should write run artifacts
+within the working directory to ensure they are associated with the
+run.
+
+By default, Guild AI generates a new directory for each run and
+creates links to required sources within that directory. Once the
+directory is prepared, Guild AI starts the run operating system
+process, which may read sources within the run directory.
+
+\subsection{Environments}
+
+Guild AI supports \emph{environments}, which are isolated runtime
+environments used for installing and using models. Guild AI supports
+environments created using
+\href{https://virtualenv.pypa.io}{\emph{virtualenv}}.
+
+\subsection{Workflows}
+
+Guild AI \emph{workflows} are patterns of model use that are enabled
+by running operations in specific order. Worflows are not currently
+formal constructs in Guild AI but are used by convention and may be
+implemented by other programs.
+
+\section{Use Cases}
+\label{sec:use-cases}
+
+The package management facilities in Guild AI enable a number of use
+cases, which are described below. In each case, the following roles
+may be referenced:
+
+\begin{description}
+\item[user] person using a model developed by someone else
+\item[developer] person developing a model, either from scratch or
+  adapting the work of others
+\item[packager] person neither using nor developing a model but who
+  packages models created by developers for users
+\end{description}
+
+\subsection{Publish a Model for Use}
+\label{sec:publish-model}
+
+A \emph{developer} may encourage others to use her model by
+documenting the steps needed to install, adapt, and use it. She may be
+motivated to simplify the user experience so that her work is more
+easily and successfully applied. The benefit to her may be quality
+feedback from expert users, improved reputation, a sense of
+contribution, or her colleagues may simply expect that her work be
+documented and easy to use.
+
+While documenting a model is undoubtedly helpful, the process can be
+burdensome for the developer. Similarly, following documented steps
+can be burdensome for users. Guild AI can be used to simultaneously
+document model features and support model usage through operations.
+
+Consider these instructions for model use:
+
+\setlength{\parindent}{1em}
+\begin{enumerate}
+\item Install required packages
+\item Download the data
+\item Prepare the data for training
+\item Train the model
+\item Export the trained model for deployment
+\end{enumerate}
+\setlength{\parindent}{0em}
+
+While these steps provide invaluable information, they still rely on
+the user to carefully execute them and troubleshoot issues. The
+process takes time and is subject to error at any step.
+
+Guild AI can be used to both document and automate these
+steps. Listing~\ref{lst:published-model} illustrates a Guild file that
+might be used to codify the steps as model operations.
+
+The operations can be run using the Guild AI command line interface as
+follows:
+
+{\footnotesize
+\begin{verbatim}
+ $ guild run prepare-data
+ $ guild run train
+ $ guild run export-model
+\end{verbatim}}
+
+Guild AI additionally provides model help, detailing available
+operations, supported flags, and operation dependencies.
+
+A user can get help for the model by running:
+
+{\footnotesize
+\begin{verbatim}
+ $ guild help
+\end{verbatim}}
+
+Documentation is automatically generated from the model description,
+making Guild AI models self documenting.
+
+The developer can chose to distribute her model as a
+project---e.g. making it available as a GitHub repository---or she may
+package the model and deploy it as an installable Python wheel
+distribution.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Sample project Guild file,
+    label={lst:published-model}]
+model: sample
+operations:
+  prepare-data:
+    description:
+      Prepare data for training
+    main: prepare
+    requires: data
+  train:
+    description: Train the model
+    main: train
+    requires: prepared-data
+  export-model:
+    description:
+      Export the model for deployment
+    main: export_model
+    requires: trained-model
+resources:
+  data:
+    description: Data for training
+    sources:
+      - url: http://my.co/data.tgz
+  prepare-data:
+    description: Prepared data
+    sources:
+      - operation: prepare-data
+  trained-model:
+    description: Trained model
+    sources:
+      - operation: train
+\end{lstlisting}
+\end{figure}
+
+\subsection{Use a Published Model}
+\label{sec:use-model}
+
+The flip side of the use case outlined in
+Section~\ref{sec:publish-model} is from the \emph{user} point of
+view. A user is interested in taking the work of a model developer and
+applying it, either by adapting the model to a new application or by
+integrating it as-is into a project.
+
+Users commonly rely on documentation to effectively use models. If a
+project is poorly documented or otherwise hard to work with, the user
+may choose not to use it. This would be a lost opportunity for both
+user and developer and would hinder model adoption and improvement.
+
+As described in Section~\ref{sec:publish-model}, a published model can
+be used by running its operations. From the standpoint of the user,
+the model can be consumed either by cloning the project
+repository---e.g. as in the case of GitHub published models---or by
+installing the model as a Python package. If, for example, the project
+was published as the package \verb|sample-project|, a could user run
+the commands below to quickly make use of its features.
+
+\setlength{\parindent}{0.67em}
+
+{\footnotesize\emph{Install the package}}
+
+{\footnotesize
+\begin{verbatim}
+ $ guild install sample-project
+\end{verbatim}}
+
+{\footnotesize\emph{View package help}}
+
+{\footnotesize
+\begin{verbatim}
+ $ guild help sample-package
+\end{verbatim}}
+
+{\footnotesize\emph{Use the model}}
+
+{\footnotesize
+\begin{verbatim}
+ $ guild run sample:prepare-data
+ $ guild run sample:train
+ $ guild run sample:export-model
+\end{verbatim}}
+
+\setlength{\parindent}{0em}
+
+This example highlights the usefulness of packaging models for
+reuse. Packaged models in this case consist of more than the
+underlying model code---they include essential configuration that lets
+Guild AI \emph{execute model operations}.
+
+\subsection{Package Third Party Models}
+\label{sec:package-maintainer}
+
+Complex software ecosystems such as GNU/Linux have formalized the role
+of a software \emph{packager}---or \emph{package maintainer}. The goal
+of a packager is to improve the value of a software distribution by
+creating high quality, useful packages that are easy to install and
+use. Packagers are often independent of the upstream software projects
+they package, serving as intermediaries between the software
+developers and distribution users.
+
+Guild AI supports this pattern by allowing packagers to incorporate
+upstream model sources into Guild packages, patching them as needed to
+provide the desired functionality to users.
+
+Consider a case where a model developer is overloaded with research
+tasks and doesn't have time to create model documentation, much less
+publish models as described in Section~\ref{sec:publish-model}. An
+independent \emph{packager} may step up to create a package instead.
+
+A packager must assume that upstream sources are available \emph{as
+  is} and cannot expect developers to fix bugs or add new
+features---though he may certainly submit requests and remain
+hopeful. Packagers therefore must be prepared to \emph{patch} model
+code as needed to get it to work as expected.
+
+\iffalse
+Guild AI provides various means of patching model source to support
+packagers in this role. Section~\ref{sec:patching} describes patching
+methods.
+\fi
+
+\subsection{Team Collaboration}
+
+The roles of \emph{developer}, \emph{user}, and \emph{packager} often
+exist within a single organization or team. Guild AI supports team
+collaboration by supporting each role as a separate concern.
+
+Within a typical organization structure, the may roles map as follows:
+
+\setlength{\parindent}{1em}
+developer $\rightarrow$ \emph{research scientist}
+
+user $\rightarrow$ \emph{software engineer}
+
+packager $\rightarrow$ \emph{research engineer}
+\setlength{\parindent}{0em}
+
+Of course this is a rough mapping and not all organizations use this
+structure. Whatever the job titles and division of labor, Guild AI
+supports the three facets of collaboration: model development, model
+use, and intermediation between developer and user as needed to
+improve usability without unduly burdening developers.
+
+\subsection{Streamline Model Developer Workflow}
+\label{sec:streamline-workflow}
+
+In the case of a single developer who has no interest in publishing
+models or otherwise supporting users, Guild AI model abstractions
+provide value. By implementing models as units of operations, as is
+the case with Guild AI model publishing, developers ensure their
+models are easy to use from the early stages of development. This
+streamlines the development process as developers can repeatedly run
+and iterate through model operations using high level commands with
+well defined, self documenting interfaces.
+
+\iffalse
+\subsection{Manage Run Artifacts}
+
+The final use case discussed involves managing runs and tracking run
+artifacts. During both model development and use, it's helpful to
+formally manage run artifacts both generated and consumed by model
+operation. This is similar to source code revision control, where
+developers can move backward and forward in time to view their
+work. In the case of Guild AI, the revisions are the results of data
+preparation, training experiments, model optimizations---anything that
+might be generated by an operation.
+
+Section~\ref{sec:runs} describes Guild AI run management.
+\fi
+
+\section{Using Models}
+
+Section~\ref{sec:use-model} describes the case of using published
+models. This section provides more details on model usage in Guild AI.
+
+\subsection{Packaged Models}
+
+Packaged models are models that have been bundled with supporting code
+and metadata into a Python wheel distribution. To generate a package,
+a developer or packager must include a \verb|package| definition in
+the project Guild file and then run the \verb|guild package| command.
+
+Listing~\ref{lst:package} contains a sample \verb|package| definition.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Sample package definition,
+    label={lst:package}]
+package: sample-project
+version: 1.0
+description: Sample packaged project
+url: https://my.co/packages/sample
+author: John Doe
+author-email: john@my.co
+license: Apache 2.0
+requires: [keras, Pillow, matlab]
+\end{lstlisting}
+\end{figure}
+
+Given a Guild file with a package definition, developers can generate
+a Python wheel distribution, which in turn can be used to install
+package models. Developers can additionally upload packages to PyPI,
+making them available to discover and install.
+
+Guild AI models are installed like any other Python package. Users may
+use Guild AI to install the package:
+
+{\footnotesize
+\begin{verbatim}
+ $ guild install sample-project
+\end{verbatim}}
+
+Or alternatively use pip:
+
+{\footnotesize
+\begin{verbatim}
+ $ pip install sample-project
+\end{verbatim}}
+
+Guild AI package requirements may be included in requirements files
+(e.g. \verb|requirements.txt|) or as dependencies of other Python
+package distributions.
+
+Package models are convenient for using models when a user doesn't
+need to modify the model source code. To use models and also have the
+option of modifying model source code, a user should use project
+models (Section \ref{sec:project-models}).
+
+\subsection{Project Models}
+\label{sec:project-models}
+
+Project models are defined in a project Guild file---i.e. a file named
+\verb|guild.yml| that resides in the top level of a project
+directory. Users may run operations on project models by running them
+from within the project directory or by referring the project
+directory in the operation specified for the \verb|guild run| command.
+
+Unlike packaged models, project models do not need to be installed
+using a command---they are available from the project itself. A user
+need only change to the project directory to run model operations.
+
+\subsection{Listing Available Models and Operations}
+
+A user may list available models using the \verb|guild models|
+command. This command lists packaged models and, if the command is run
+within a project, project models.
+
+Each model has one or more operations, which can be listed using the
+\verb|guild ops| command.
+
+The ability to discover available models and operations is a key
+feature enabling model use in Guild AI. Without formally defining
+these, users must infer model capabilities from documentation and
+source code.
+
+\subsection{Getting Help for Models}
+
+A user may run the \verb|guild help| command to show details about a
+model, its operations, operation flags, and resource
+dependencies. This is similar to the \emph{man} facility on many
+systems.
+
+A user may also get help for a particular operation by using the
+\verb|--help-op| option with the \verb|guild run| command. This is
+similar to the \verb|--help| option available for many programs.
+
+Figure~\ref{fig:op-help} contains sample help for the \verb|train|
+operation of the \verb|gpkg.mnist/cnn| package model.
+
+\begin{figure}
+\begin{lstlisting}
+Usage: guild run [OPTIONS] cnn:train
+[FLAG]...
+
+Train the CNN
+
+Use 'guild run --help' for a list of
+options.
+
+Dependencies:
+  mnist-dataset  Yann Lecun's MNIST
+                 dataset in compressed
+                 IDX format
+
+Flags:
+  batch-size  Number of images to
+              include in a training
+              batch (100)
+  epochs      Number of epochs to train
+              (10)
+\end{lstlisting}
+\caption{Sample operation help}
+\label{fig:op-help}
+\end{figure}
+
+It is important to note that model and operation help is automatically
+generated from model descriptions. This facility lowers the cost of
+model documentation for developers and gives users a consistent
+interface for discovering model capabilities and the commands for
+using them.
+
+\subsection{Running Operations}
+
+Once a model is available---either as an installed package model or
+defined in a project---it can be used by running \emph{operations}. An
+operation is an action that can be performed on a model. Operations
+both \emph{define and implement} model capabilities. The process of
+using a model is the process of running operation.
+
+Operations may define an entire application development life cycle for
+one model or a host of models that work together.
+
+Section~\ref{sec:operations} lists common operation names.
+
+The act of running an operation starts a \emph{run}, which is both an
+operating process and a Guild AI managed file system artifact that
+contains run details and generated output.
+
+A user can run an operation using the \verb|guild run| command.
+
+Section~\ref{sec:runs} describes how runs are managed.
+
+\subsection{Viewing and Comparing Runs}
+
+As users and developers run model operations, they can view the
+results in various ways. Guild AI provides a comprehensive command
+line interface for managing runs, which is outlined in
+Section~\ref{sec:runs}.
+
+Guild AI also provides various methods for visualizing runs. Guild
+View is an application provided with Guild AI that displays run
+details including run files. Guild AI integrates TensorBoard \cite{tb}
+as a visualization tool for viewing TensorFlow event logs generated by
+model operations.\footnote{Not all operations generate TensorFlow
+  event logs---these must be explicitly written during a run by the
+  operation.}
+
+\subsection{Accessing Generated Artifacts}
+
+Operations generate \emph{artifacts}, which are Guild AI managed files
+stored on the local file system. Guild AI does not attempt to
+obfuscate generated artifacts---they are maintained in the run
+directory as written during the operation.
+
+Artifacts are routinely used as inputs to subsequent operations. For
+example, a TensorFlow checkpoint generated by a \verb|train| operation
+may be used as input to an \verb|export-and-freeze| operation. The
+process of resolving required operation sources is automatic and part
+of Guild AI's run support.
+
+Artifacts may also be accessed directly by users given their file
+system paths. A user can list the full paths for all files associated
+with a run using the \verb|guild runs info| command with the
+\verb|-ff| option. Using their paths, a user can copy desired files or
+link to them as needed.
+
+Runs may also be \emph{exported} to a location using the
+\verb|guild export| command. Exported runs are copied---or moved, if
+specified---to a specified file system directory. This can be used to
+create backups or to transfer runs to another location.
+
+\subsection{Isolating Runs Using Environments}
+
+The discussion of using models to this point has not mentioned
+\emph{environments}---environment are optional for using Guild
+AI. Environments are useful, however, for isolating installed packages
+and runs on a system.
+
+When running Guild AI operations in an activated environment, the
+following are environment specific:
+
+\begin{itemize}
+\item Installed packages and therefore installed models
+\item Runs
+\end{itemize}
+
+Environments are created using the \verb|guild init| command. Once
+created, an environment must be explicitly activated using the
+\verb|source guild-env| command.
+
+Environments are useful isolating project level work. It is common to
+have a separate environment for each project or work stream.
+
+\section{Managing Runs}
+\label{sec:runs}
+
+A \emph{run} is a formally managed file system artifact generated by
+an operation. Runs may also refer to the operating system process
+associated with a running operation.
+
+Runs contain critical information for tracking and understanding what
+happened during an operation:
+
+\begin{itemize}
+\item Run metadata such as the associated model and operation, status,
+  start and stop times, operating system command and environment, and
+  resolved dependencies
+\item Output generated by the run---specifically the process standard
+  output and standard error
+\item Files used by the operation (resolved resource sources)
+\item Files generated by the operation
+\end{itemize}
+
+\subsection{Starting a Run}
+
+Runs are started using the \verb|guild run| command, referencing a
+model operation. Operations may be run with additional flag values
+provided in the format \verb|NAME=VALUE|.
+
+Here's an example of running an operation with flag values:
+
+{\footnotesize
+\begin{verbatim}
+ $ guild run mnist:train \
+     steps=10000 \
+     batch-size=64 \
+     learning-rate=0.0001
+\end{verbatim}}
+
+\subsection{Listing Runs}
+
+Runs may be listed using the \verb|guild runs| command. Runs are
+displayed with their unique ID, operation name, start time, status,
+and user label.
+
+Listed runs may be filtered by status, operation, and label.
+
+\subsection{Getting Run Information}
+
+Information about one or more runs may be displayed using the
+\verb|guild runs info| command. By default, high level run information
+such as the run ID, operation, start time, command, exit status, and
+operating system pid are displayed. Additional command options may be
+used to view more run information including files, flag values,
+dependencies, and operation output.
+
+\subsection{Deleting Runs}
+
+One or more runs may be deleted using the \verb|guild runs rm|
+command. Runs may be deleted using status, operation, or label.
+
+Guild AI will restore deleted runs with \verb|guild runs restore| and
+permanently delete runs using \verb|guild runs purge|.
+
+\section{Developing Models}
+
+As discussed above, published models---deployed from installed
+packages or as projects---are used by running
+\emph{operations}. Operations generate \emph{artifacts} that can be
+used in subsequent operations or used as final outputs in an
+application development workflow.
+
+In this section we discuss how models are created using Guild AI.
+
+\subsection{Developing a Model from Scratch}
+
+When developing a model from scratch, a developer may ask two
+questions:
+
+\begin{itemize}
+\item What is the defining characteristic of the model?
+\item What can users do with the model?
+\end{itemize}
+
+The answers to these questions will inform the decision of what to
+name the model and its operations. These values can be stubbed out in
+a Guild file to provide a scaffold for implementation.
+
+In some cases, this may simply be a matter of selecting a model name
+and creating a \verb|train| operation. Listing~\ref{lst:pet-stub}
+illustrates a straightforward pet classifier.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Sample Guild file for a pet classifier,
+    label={lst:pet-stub}]
+model: pets
+description:
+  Pet classifier using a CNN
+operations:
+  train:
+    description: Train the classifier
+    main: train
+    flags:
+      images:
+        description:
+          Directory containing the pet
+          images to train
+        required: yes
+      epochs:
+        description:
+          Number of epochs to train
+        default: 100
+\end{lstlisting}
+\end{figure}
+
+With even a simple stub, a developer can formalize the model and what
+it does. This stage clarifies the model interface before the
+functionality is implemented.
+
+With a basic skeleton in place, the developer can \emph{implement}
+model operations. In the case of the pet classifier in
+Listing~\ref{lst:pet-stub} this means implementing train support in a
+file named \verb|train.py| that resides in the project directory.
+
+Operations can be developed and tested early using Guild AI. Each time
+\verb|guild run| is used to test an operation, Guild AI generates a
+distinct, tracked run. Runs may be compared over time to help answer
+questions or resolve issues.
+
+Guild AI provides two additional mechanisms to help model developers
+implement operations. Both effect the \emph{run directory}
+(Section~\ref{sec:run-dir}) used by Guild AI.
+
+The first mechanism is the use of \verb|--run-dir| with the
+\verb|guild run| command. This option specifies an alternative
+directory for the run. This is helpful when the developer doesn't want
+to generate new runs during the development process.
+
+The second mechanism is the use of \verb|--stage| with the
+\verb|guild run| command. This option may be used to stage a run in an
+alternative directory without running the operation. This is helpful
+when the developer wants to study the run directory layout or to run
+low level commands or scripts during the development process.
+
+\iffalse
+The developer can continue to evolve the model operations as needed to
+satisfy user requirements. This may include new operations or
+additional operation flags, which give users more flexibility when
+running an operation. The developer may similarly add new models to
+the Guild file.
+\fi
+
+\subsection{Adapting Existing Model Code}
+
+In many cases, a developer will already have working model code she
+wants to incorporate into a formalized model definition. As with the
+role of \emph{packager} (Section~\ref{sec:package-maintainer}), a
+developer may be required to work with upstream sources she cannot
+easily change. Guild AI provides a number of features that support the
+adaptation of existing model code into usable models.
+
+The operation \verb|main| attribute specifies a Python main module to
+run. In many cases, a developer can simply reference an existing
+Python script to incorporate it into an operation. In cases where a
+script doesn't exist---for example, the model code is in a Jupyter
+Notebook---the developer must create a new script that contains the
+applicable model code and specify it for the operation.
+
+Operation \emph{flags} specified in the form \verb|NAME=VALUE| as
+arguments to the \verb|guild run| command are passed to the Python
+main module as command line arguments in the form
+\verb|--NAME VALUE|. For example, assuming an operation \verb|train|
+with a main module \verb|train|, the command
+\verb|guild run train epochs=100| would be translated to the Python
+command \verb|python -m train --epochs 100|. In this way developers
+can parameterize scripts using operation flags.\footnote{It is
+  standard practice to use Python's argparse module to support named
+  command line options following the getopt convention \cite{getopt}.}
+
+\iffalse
+If a flag name doesn't correspond to the option name expected
+(e.g. the train script expected the option \verb|num_epochs|) the
+developer can specify an alternative argument name for a flag using
+the \verb|arg-name| attribute.
+\fi
+
+\subsection{Patching}
+\label{sec:patching}
+
+In cases where a developer cannot modify upstream sources or chooses
+not to (e.g. to simplify ongoing maintenance) he may choose to patch
+model sources for use in a model. Guild AI supports two methods of
+patching.
+
+The first method is to run a post processing script on required model
+sources. This can be specified using a \verb|post-process| command for
+a model source that applies patch files to upstream sources. Guild AI
+will use the patched versions for related operations.
+
+The second method is to wrap upstream scripts and monkey patch the
+Python environment as needed to change behavior. An example of this
+can be found in the \verb|gpkg.slim| package, which patches the
+TensorFlow \verb|slim.losses.softmax_cross_entropy| module to add
+support for balanced weight training. This technique successfully adds
+a useful feature while avoiding the need to modify the upstream train
+support in TF Slim.\footnote{While one could argue that it would be
+  better to submit a pull request with the new functionality to
+  upstream authors, there are always cases where this is not an
+  option. Patching in these cases may be the only way to fix issues or
+  add features.}
+
+\subsection{Model Definition Reuse}
+
+Guild AI provides a number of features that support model definition
+reuse.
+
+\subsubsection{Configuration Inheritance}
+
+Guild files may contain \verb|config| sections that that can be
+inherited by models definitions. Listing~\ref{lst:inheritance}
+contains two models, each inheriting the properties of shared
+configuration. The shared config \verb|model-base| defines the common
+model operations and uses \emph{parameters} to define a model name and
+default learning rate.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Configuration inheritance,
+    label={lst:inheritance}]
+- config: model-base
+  operations:
+    train:
+      main: train --model {{model-name}}
+      flags:
+        epochs: 100
+        learning-rate: {{default-lr}}
+
+- model: logreg
+  extends: model-base
+  params:
+    model-name: logreg
+    default-lr: 0.01
+
+- model: cnn
+  extends: model-base
+  params:
+    model-name: cnn
+    default-lr: 0.0001
+\end{lstlisting}
+\end{figure}
+
+Configuration inheritance can be applied across Guild files---e.g. to
+configuration defined in packages or other projects. This is useful
+for extending model definitions from other
+developers. Listing~\ref{lst:extend-slim} demonstrates how a model can
+inherit all of the operations of another model with a single line of
+configuration.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Extending PNASNet Mobile,
+    label={lst:extend-slim}]
+- model: my-classifier
+  extends: gpkg.slim.models/pnasnet-mobile
+\end{lstlisting}
+\end{figure}
+
+Configuration inheritance has proven effective at managing complex
+model configuration. This is evident in the \verb|gpkg.slim| and
+\verb|gpkg.object-detection| packages, which make extensive use of
+configuration inheritance to simplify their respective Guild files.
+
+\iffalse
+\subsubsection{Configuration Includes}
+
+Configuration may also be reused by including shared configuration
+files using \verb|include| objects. Listing~\ref{lst:shared} and
+Listing~\ref{lst:include-shared} illustrate how includes can be used.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Shared configuration (e.g. defined in shared.yml),
+    label={lst:shared}]
+- config: model-base
+  operations:
+    train: train
+\end{lstlisting}
+\end{figure}
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Use of includes (e.g. defined in guild.yml),
+    label={lst:include-shared}]
+- include: shared.yml
+
+- model: model-a
+  extends: model-base
+
+- model: model-b
+  extends: model-base
+\end{lstlisting}
+\end{figure}
+
+Includes may also be used to merge shared configuration into other
+configuration. Listing~\ref{lst:include-flags} illustrates how shared
+configuration can be included into operation flags. The special
+attribute \verb|$include| signifies that the corresponding value
+defined in the referenced config should be merged into the current
+value. The value for \verb|$include| can be a list to merge from
+multiple sources. In the example, the value for \verb|learning-rate|
+is redefined in the operation.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Including shared flag configuration,
+    label={lst:include-flags}]
+- config: default-train-flags
+  flags:
+    epochs: 100
+    batch-size: 32
+    learning-rate: 0.01
+
+- model: sample
+  operations:
+    train:
+      main: train
+      flags:
+        $include: default-train-flags
+        learning-rate: 0.001
+\end{lstlisting}
+\end{figure}
+
+\fi
+
+\subsubsection{Reusing Python Main Modules}
+
+The final method of model definition reuse discussed is that of
+\emph{Python main module reuse}. Main modules---i.e. the modules
+referenced in an operation \verb|main| specification---may reside in
+any installed Python package. To reuse the main module, a developer
+need only include the package reference in the main specification.
+
+Listing~\ref{lst:tflite_convert} illustrates the use of the TensorFlow
+module \verb|tflite_convert| to generate a TF Lite file for an
+operation.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Reusing a Python main module,
+    label={lst:tflite_convert}]
+model: sample
+operations:
+  tflite:
+    main: tensorflow/contrib/lite/python/tflite_convert
+\end{lstlisting}
+\end{figure}
+
+Developers may create packages of reusable modules that can be easily
+used to implement model operations. For example, consider an
+organization that runs a specialized inference server that hosts
+models deployed using an HTTP POST interface. The model development
+team might create a package \verb|server-utils| that contains a Python
+main module \verb|server_utils.deploy| that performs the
+deployment.
+
+Listing~\ref{lst:deploy} illustrates how such a facility could be
+incorporated into a model to enable deployments. In the example, the
+model is defined in a package that requires the \verb|server-utils|
+package, which will be automatically installed by the command
+\verb|guild install classifiers|.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Quickly enabling model deploy,
+    label={lst:deploy}]
+- package: classifiers
+  requires: [server-utils]
+
+- model: resnet-classifier
+  operations:
+    train: resnet_train
+    deploy: server_utils.deploy
+    requires: trained-model
+  resources:
+    trained-model:
+      sources:
+        - operation: train
+\end{lstlisting}
+\end{figure}
+
+\subsection{Testing}
+
+Users may trust that installed packages have undergone testing before
+they being published. The goal of managing machine learning models as
+packages, after all, is to ensure that models work as advertised. In
+support of this goal, Guild AI lets developers and packagers specify
+tests that can be used to model integrity.
+
+Listing~\ref{lst:tests} contains two tests: one that verifies model
+help---ensuring that what the user sees when she runs
+\verb|guild help| is what the developer intends---and another that
+exercises model operations and checks results.
+
+\begin{figure}
+\begin{lstlisting}[
+    caption=Model tests,
+    label={lst:tests}]
+- test: help
+  steps:
+    - compare-help: test/help
+- test: model
+  steps:
+    - run-op: prepare-samples
+      flags:
+        images: test/samples
+    - run-op: train
+      expected:
+        - file: checkpoint
+    - run-op: evaluate
+      expected:
+        - scalar: accuracy > 0.7
+\end{lstlisting}
+\end{figure}
+
+The model test runs three operations: prepare-samples, train, and
+evaluate. The train step asserts that a checkpoint file exist, which
+confirms that the operation successfully saved a checkpoint. The
+evaluate step asserts that the accuracy for the trained model is at
+least 0.7.
+
+Tests are run using the \verb|guild test| command.
+
+\iffalse
+Tests may be run on an ad hoc basis or as a continuous integration
+release process.
+\fi
+
+\iffalse
+\section{Implementation}
+
+Guild AI is written in the Python programming language. It makes use
+of a number of excellent open source libraries, some of which are
+listed below.
+
+\subsection{Command Line Interface}
+
+Guild AI is primarily a command line tool. Users type Guild AI
+commands in the form: \verb|guild COMMAND [ARG]...|
+
+Guild AI makes use of the Click Python library \cite{click} to
+implement its core command line processing support.
+
+\subsection{Configuration Processing}
+
+Guild AI supports YAML \cite{yaml} as its configuration language for both
+Guild files and user configuration. It uses the PyYAML Python library
+(ref) for low level parsing.
+
+Guild AI has implemented a novel scheme for configuration reuse, which
+supports multiple inheritance, file includes, and section
+includes. The reuse support allows Guild AI developers to maintain
+complex model configurations with easily managed abstractions.
+
+\subsection{Resource Resolution}
+
+Guild AI implements its own resource resolution scheme, which is used
+to setup runs with required resource sources. Guild makes use of
+directed acyclical graphs (DAGs) to model and efficiently resolve
+complex interdependencies across operation.
+
+\subsection{Model Testing}
+
+Guild AI supports model testing through a novel configuration scheme
+that integrates with model definitions. Tests may be defined for one
+or more models, each running and verifying one or more operations.
+
+\subsection{Packaging and Distribution}
+
+Guild AI packages are valid Python wheel distributions. The underlying
+libraries used to install Guild packages are the same as those used by
+the \verb|pip| program to install PyPI packages. As a result, Guild
+AI can be used to install PyPI packages and pip can be used to install
+Guild AI packages---the process is the same in both cases.
+
+\subsection{Run Indexing}
+
+Guild AI uses a run indexing scheme to optimize run queries when
+comparing runs and uses the Whoosh Python library (ref) in support
+that.
+
+\subsection{Run Visualization}
+
+Guild AI provides various visualization tools, including its own run
+viewer (Guild View) and integration with TensorBoard (ref).
+
+Guild View is implemented using the VueJS library (ref) for the front
+end and Werkzeug (ref) for the HTTP API back end.
+\fi
+
+\section{Status}
+
+Guild AI is freely available under the Apache 2.0 open source
+license. It has been under active development for the last two years
+and undergone significant revision and updates during that time based
+on user feedback and real world application development.
+
+There have been several packaging initiatives that have produced
+reusable models \cite{pkg} that fulfill the goals
+outlined in this paper. Specifically, the packages support:
+
+\begin{itemize}
+\item Use without code changes
+\item Reuse by developers who want to new models that leverage
+  packaged functionality
+\item Package maintainer workflow as described in
+  Section~\ref{sec:package-maintainer}
+\item Regression testing as a part of a continuous integration process
+\end{itemize}
+
+\bibliography{paper}
+\bibliographystyle{sysml2019}
+
+\end{document}

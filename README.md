@@ -52,7 +52,8 @@
 
 ## Notes
 
-"Standards" - good word, Guild does have something to say here. What?
+"Standards" - good word, Guild does have something to say here. But do
+we want to put forward Guild's schema as a standard? I don't think so.
 
 Communication between researchers and practitioners. What's the common
 language to share successes and challenges?
@@ -67,6 +68,10 @@ scenarios.
 
 ## Refined Notes
 
-Repurpose the package content from SysML?
+Talk about how Guild supports independent model
 
-Packaging Machine Learning Models for AutoML with Guild AI
+ecosystem
+
+## Titles
+
+Guild AI: ... for AutoML
